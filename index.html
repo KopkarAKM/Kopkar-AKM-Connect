@@ -175,7 +175,10 @@
 
       const handleLogin = async (e) => {
         e.preventDefault();
-        if (!nama || !password) {
+        const cleanNama = nama.trim();
+        const cleanPassword = password.trim();
+
+        if (!cleanNama || !cleanPassword) {
            showToast('Mohon isi nama pengguna dan kata sandi.', 'warning');
            return;
         }
@@ -183,30 +186,23 @@
         setIsLoading(true);
 
         try {
-          if (nama.toLowerCase().trim() === 'admin' && password.trim() === 'admin') {
-            setTimeout(() => {
-                showToast('Masuk mode simulasi berhasil.', 'success');
-                onLoginSuccess({ Nama: 'Admin Uji Coba', NoAnggota: '12345', TempatTanggalLahir: 'Jakarta, 1 Jan 1990', Site: 'KM 73' });
-            }, 800);
-            return;
-          }
-
           const response = await fetch(GAS_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'login', nama, password })
+            body: JSON.stringify({ action: 'login', nama: cleanNama, password: cleanPassword })
           });
           
           const result = await response.json();
           
           if (result.status === 'success') {
             showToast(`Selamat datang kembali, ${result.data.Nama.split(' ')[0]}!`, 'success');
-            onLoginSuccess(result.data);
+            // Simpan password dalam sesi terenkripsi sementara untuk otentikasi update profile
+            onLoginSuccess({ ...result.data, _sessionPassword: cleanPassword });
           } else {
-            showToast(result.message || 'Nama atau No Anggota salah.', 'error');
+            showToast(result.message || 'Nama/No Anggota atau Kata Sandi salah.', 'error');
           }
         } catch (err) {
-          showToast('Koneksi gagal. Periksa jaringan Anda.', 'error');
+          showToast('Koneksi gagal. Periksa jaringan internet Anda.', 'error');
         } finally {
           setIsLoading(false);
         }
@@ -231,14 +227,14 @@
                 
                 {/* Username Input */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[13px] font-sans font-semibold text-text-main">Nama Pengguna</label>
+                  <label className="text-[13px] font-sans font-semibold text-text-main">Nama / No. Anggota</label>
                   <div className="relative flex items-center group">
                     <span className="material-symbols-outlined absolute left-3.5 text-text-muted group-focus-within:text-primary transition-colors text-[22px]">person</span>
                     <input 
                       value={nama} 
                       onChange={(e)=>setNama(e.target.value)} 
                       className="w-full h-12 pl-11 pr-4 bg-background rounded-xl border border-gray-200 text-text-main text-sm font-sans focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all outline-none" 
-                      placeholder="e.g. agus_santoso" 
+                      placeholder="Masukkan Nama atau No. Anggota" 
                       required 
                       type="text" 
                     />
@@ -256,7 +252,7 @@
                       value={password} 
                       onChange={(e)=>setPassword(e.target.value)} 
                       className="w-full h-12 pl-11 pr-12 bg-background rounded-xl border border-gray-200 text-text-main text-sm font-sans focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all outline-none" 
-                      placeholder="Masukkan No. Anggota" 
+                      placeholder="Masukkan Kata Sandi" 
                       required 
                       type={showPassword ? "text" : "password"} 
                     />
@@ -268,9 +264,9 @@
 
                 {/* Helper Banner */}
                 <div className="bg-primary-light/40 border border-primary-light p-3.5 rounded-xl flex items-start gap-3 mt-1">
-                  <span className="material-symbols-outlined text-primary text-[20px] shrink-0">info</span>
+                  <span className="material-symbols-outlined text-primary text-[20px] shrink-0">verified_user</span>
                   <p className="text-[12px] font-sans leading-relaxed text-text-main">
-                    Gunakan <strong>Nama</strong> dan <strong>No Anggota</strong> sesuai data pusat. (Ketik "admin" untuk uji coba).
+                    Masuk menggunakan <strong>Nama Lengkap</strong> atau <strong>Nomor Anggota</strong> yang terdaftar di pusat.
                   </p>
                 </div>
 
@@ -286,7 +282,7 @@
             </section>
             
             <footer className="text-center mt-2">
-                <p className="text-[13px] font-sans text-text-muted">Kendala login? <a href="#" className="font-semibold text-primary">Hubungi Admin</a></p>
+                <p className="text-[13px] font-sans text-text-muted">Kendala login? <a href="#" className="font-semibold text-primary">Hubungi Pengurus / Admin</a></p>
             </footer>
           </main>
         </div>
@@ -412,7 +408,7 @@
               </a>
             ) : (
               <button disabled className="w-full h-11 rounded-xl bg-gray-100 text-gray-400 font-sans font-semibold text-[13px] flex items-center justify-center gap-2">
-                <span className="material-symbols-outlined text-[18px]">lock</span> Segera Hadir (Q4)
+                <span className="material-symbols-outlined text-[18px]">lock</span> Segera Hadir
               </button>
             )}
           </div>
@@ -451,16 +447,27 @@
       );
     };
 
-    const InputField = ({ label, icon, ...props }) => (
+    const InputField = ({ label, icon, helper, isReadOnly, lockBadge, ...props }) => (
       <div className="flex flex-col gap-1.5">
-          <label className="text-[13px] font-sans font-semibold text-text-main">{label}</label>
+          <div className="flex justify-between items-center">
+            <label className="text-[13px] font-sans font-semibold text-text-main flex items-center gap-1.5">
+              {label}
+              {lockBadge && (
+                <span className="text-[10px] font-medium bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                  <span className="material-symbols-outlined text-[12px]">lock</span> {lockBadge}
+                </span>
+              )}
+            </label>
+          </div>
           <div className="relative flex items-center group">
-              {icon && <span className="material-symbols-outlined absolute left-3.5 text-text-muted group-focus-within:text-primary transition-colors text-[20px]">{icon}</span>}
+              {icon && <span className={`material-symbols-outlined absolute left-3.5 ${isReadOnly ? 'text-gray-400' : 'text-text-muted group-focus-within:text-primary'} transition-colors text-[20px]`}>{icon}</span>}
               <input 
                   {...props} 
-                  className={`w-full h-12 ${icon ? 'pl-11' : 'pl-4'} pr-4 bg-background rounded-xl border border-gray-200 text-text-main text-[14px] font-sans focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all outline-none`} 
+                  readOnly={isReadOnly}
+                  className={`w-full h-12 ${icon ? 'pl-11' : 'pl-4'} pr-4 ${isReadOnly ? 'bg-gray-100/80 text-gray-500 cursor-not-allowed border-gray-200' : 'bg-background text-text-main border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/10'} rounded-xl border text-[14px] font-sans transition-all outline-none`} 
               />
           </div>
+          {helper && <span className="text-[11px] font-sans text-text-muted">{helper}</span>}
       </div>
     );
 
@@ -502,43 +509,52 @@
       );
     };
 
-    const PasswordModal = ({ isOpen, onClose, userData, showToast }) => {
+    /**
+     * Modal Ganti Sandi dengan Verifikasi Sandi Lama (Prioritas 1)
+     */
+    const PasswordModal = ({ isOpen, onClose, userData, setUserData, showToast }) => {
+      const [oldPassword, setOldPassword] = useState('');
       const [newPassword, setNewPassword] = useState('');
       const [confirmPassword, setConfirmPassword] = useState('');
+      const [showOld, setShowOld] = useState(false);
+      const [showNew, setShowNew] = useState(false);
       const [isLoading, setIsLoading] = useState(false);
       
       if (!isOpen) return null;
 
       const handleSubmit = async (e) => {
           e.preventDefault();
+          if (!oldPassword) {
+              showToast('Kata sandi saat ini (lama) wajib diisi!', 'warning');
+              return;
+          }
           if (newPassword !== confirmPassword) {
-              showToast('Kata sandi tidak cocok!', 'error');
+              showToast('Konfirmasi kata sandi baru tidak cocok!', 'error');
               return;
           }
           if (newPassword.length < 5) {
-              showToast('Kata sandi minimal 5 karakter.', 'warning');
+              showToast('Kata sandi baru minimal 5 karakter.', 'warning');
               return;
           }
           
           setIsLoading(true);
           try {
-              if (userData?.Nama === 'Admin Uji Coba') {
-                  setTimeout(() => {
-                      showToast('Sandi berhasil diubah di mode simulasi.', 'success');
-                      setIsLoading(false);
-                      onClose();
-                  }, 800);
-                  return;
-              }
-              
               const response = await fetch(GAS_URL, {
                   method: 'POST',
                   headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                  body: JSON.stringify({ action: 'changePassword', NoAnggota: userData.NoAnggota, newPassword })
+                  body: JSON.stringify({ 
+                    action: 'changePassword', 
+                    NoAnggota: userData.NoAnggota, 
+                    oldPassword: oldPassword.trim(),
+                    newPassword: newPassword.trim() 
+                  })
               });
               const result = await response.json();
               if (result.status === 'success') {
                   showToast('Kata sandi berhasil diperbarui.', 'success');
+                  if (setUserData) {
+                    setUserData(prev => ({ ...prev, _sessionPassword: newPassword.trim() }));
+                  }
                   onClose();
               } else {
                   showToast(result.message || 'Gagal mengubah sandi', 'error');
@@ -552,56 +568,87 @@
 
       return (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-5 bg-black/50 backdrop-blur-sm animate-slide-up">
-              <div className="bg-surface rounded-3xl w-full max-w-[360px] shadow-2xl overflow-hidden flex flex-col">
+              <div className="bg-surface rounded-3xl w-full max-w-[380px] shadow-2xl overflow-hidden flex flex-col">
                   <div className="p-5 border-b border-gray-100 flex justify-between items-center">
-                      <h3 className="font-display font-bold text-[18px] text-text-main flex items-center gap-2">
+                      <h3 className="font-display font-bold text-[17px] text-text-main flex items-center gap-2">
                           <span className="material-symbols-outlined text-primary">lock_reset</span>
-                          Ubah Kata Sandi
+                          Ubah Kata Sandi Akun
                       </h3>
                       <button onClick={onClose} className="text-text-muted active:bg-gray-100 p-2 rounded-full transition-colors flex items-center justify-center">
                           <span className="material-symbols-outlined text-[20px]">close</span>
                       </button>
                   </div>
-                  <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-5">
+                  <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4">
+                      
+                      {/* Sandi Lama */}
+                      <div className="flex flex-col gap-1.5">
+                          <label className="text-[13px] font-sans font-semibold text-text-main">Kata Sandi Saat Ini (Lama)</label>
+                          <div className="relative flex items-center">
+                            <input 
+                                type={showOld ? "text" : "password"} 
+                                value={oldPassword} 
+                                onChange={(e) => setOldPassword(e.target.value)} 
+                                className="w-full h-11 pl-4 pr-11 bg-background rounded-xl border border-gray-200 text-text-main text-sm focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all outline-none" 
+                                required 
+                                placeholder="Ketik kata sandi lama Anda"
+                            />
+                            <button type="button" onClick={() => setShowOld(!showOld)} className="absolute right-3 text-text-muted p-1">
+                                <span className="material-symbols-outlined text-[18px]">{showOld ? 'visibility_off' : 'visibility'}</span>
+                            </button>
+                          </div>
+                      </div>
+
+                      {/* Sandi Baru */}
                       <div className="flex flex-col gap-1.5">
                           <label className="text-[13px] font-sans font-semibold text-text-main">Kata Sandi Baru</label>
-                          <input 
-                              type="password" 
-                              value={newPassword} 
-                              onChange={(e) => setNewPassword(e.target.value)} 
-                              className="w-full h-12 px-4 bg-background rounded-xl border border-gray-200 text-text-main text-sm focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all outline-none" 
-                              required 
-                              placeholder="Ketik sandi baru Anda"
-                          />
+                          <div className="relative flex items-center">
+                            <input 
+                                type={showNew ? "text" : "password"} 
+                                value={newPassword} 
+                                onChange={(e) => setNewPassword(e.target.value)} 
+                                className="w-full h-11 pl-4 pr-11 bg-background rounded-xl border border-gray-200 text-text-main text-sm focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all outline-none" 
+                                required 
+                                placeholder="Minimal 5 karakter"
+                            />
+                            <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 text-text-muted p-1">
+                                <span className="material-symbols-outlined text-[18px]">{showNew ? 'visibility_off' : 'visibility'}</span>
+                            </button>
+                          </div>
                       </div>
+
+                      {/* Konfirmasi Sandi Baru */}
                       <div className="flex flex-col gap-1.5">
-                          <label className="text-[13px] font-sans font-semibold text-text-main">Konfirmasi Sandi Baru</label>
+                          <label className="text-[13px] font-sans font-semibold text-text-main">Konfirmasi Kata Sandi Baru</label>
                           <input 
                               type="password" 
                               value={confirmPassword} 
                               onChange={(e) => setConfirmPassword(e.target.value)} 
-                              className={`w-full h-12 px-4 bg-background rounded-xl border ${confirmPassword && newPassword !== confirmPassword ? 'border-error focus:ring-error/20' : 'border-gray-200 focus:border-primary focus:ring-primary/10'} text-text-main text-sm transition-all outline-none`}
+                              className={`w-full h-11 px-4 bg-background rounded-xl border ${confirmPassword && newPassword !== confirmPassword ? 'border-error focus:ring-error/20' : 'border-gray-200 focus:border-primary focus:ring-primary/10'} text-text-main text-sm transition-all outline-none`}
                               required 
                               placeholder="Ulangi sandi baru"
                           />
                           {confirmPassword && newPassword !== confirmPassword && (
-                              <span className="text-[11px] font-sans font-medium text-error flex items-center gap-1 mt-1">
+                              <span className="text-[11px] font-sans font-medium text-error flex items-center gap-1 mt-0.5">
                                   <span className="material-symbols-outlined text-[14px]">warning</span> Sandi tidak cocok
                               </span>
                           )}
                       </div>
+
                       <div className="mt-4 flex gap-3">
-                          <button type="button" onClick={onClose} className="flex-1 h-12 rounded-xl font-sans font-semibold text-text-main bg-gray-100 active:bg-gray-200 transition-colors">Batal</button>
-                          <button type="submit" disabled={isLoading} className="flex-1 h-12 rounded-xl font-sans font-semibold text-white bg-primary active:bg-primary-dark transition-colors flex items-center justify-center shadow-card">
-                              {isLoading ? <span className="material-symbols-outlined animate-spin text-[20px]">progress_activity</span> : 'Simpan'}
+                          <button type="button" onClick={onClose} className="flex-1 h-11 rounded-xl font-sans font-semibold text-text-main bg-gray-100 active:bg-gray-200 transition-colors text-[14px]">Batal</button>
+                          <button type="submit" disabled={isLoading} className="flex-1 h-11 rounded-xl font-sans font-semibold text-white bg-primary active:bg-primary-dark transition-colors flex items-center justify-center shadow-card text-[14px]">
+                              {isLoading ? <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> : 'Simpan Sandi'}
                           </button>
                       </div>
                   </form>
               </div>
           </div>
       );
-    }
+    };
 
+    /**
+     * Layar Edit Profil dengan Penguncian Data Resmi & Validasi Form (Prioritas 1 & 2)
+     */
     const EditProfileScreen = ({ onNavigate, userData, setUserData, showToast }) => {
       const [formData, setFormData] = useState(userData || {});
       const [isLoading, setIsLoading] = useState(false);
@@ -609,25 +656,45 @@
       const [uploadMsg, setUploadMsg] = useState({ Foto: '', KTP: '' });
       const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
-      const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+      const handleChange = (e) => {
+        const { name, value } = e.target;
+        
+        // Validasi input khusus angka untuk NIK, NoHP, Rekening
+        if (name === 'NoKTP' || name === 'NoHP' || name === 'NoRekening') {
+          const numericValue = value.replace(/[^0-9]/g, '');
+          setFormData({ ...formData, [name]: numericValue });
+          return;
+        }
+
+        setFormData({ ...formData, [name]: value });
+      };
 
       const handleUpdateData = async (e) => {
         e.preventDefault();
+
+        // Validasi NIK KTP (Wajib 16 Digit jika diisi)
+        if (formData.NoKTP && formData.NoKTP.length !== 16) {
+          showToast('Nomor KTP (NIK) harus berjumlah 16 digit angka.', 'warning');
+          return;
+        }
+
+        // Validasi No. Handphone (Minimal 10 digit)
+        if (formData.NoHP && formData.NoHP.length < 10) {
+          showToast('Nomor Handphone minimal 10 digit.', 'warning');
+          return;
+        }
+
         setIsLoading(true);
         try {
-          if (formData.Nama === 'Admin Uji Coba') {
-            setTimeout(() => {
-                setUserData(formData);
-                showToast('Profil berhasil disimpan di mode simulasi.', 'success');
-                onNavigate('dashboard');
-            }, 1000);
-            return;
-          }
-
           const response = await fetch(GAS_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'updateProfile', NoAnggota: userData.NoAnggota, userData: formData })
+            body: JSON.stringify({ 
+              action: 'updateProfile', 
+              NoAnggota: userData.NoAnggota, 
+              password: userData._sessionPassword || '',
+              userData: formData 
+            })
           });
           const result = await response.json();
           if (result.status === 'success') {
@@ -650,18 +717,6 @@
 
         if (file.size > 5 * 1024 * 1024) {
             showToast('Ukuran file terlalu besar. Maksimal 5MB.', 'warning');
-            return;
-        }
-
-        if (formData.Nama === 'Admin Uji Coba') {
-            setUploadingState(prev => ({...prev, [fileType]: true}));
-            setTimeout(() => {
-                const dummyUrl = "https://i.ibb.co.com/8LnVP8vp/1.png"; 
-                setFormData(prev => ({...prev, [fileType]: dummyUrl}));
-                setUserData(prev => ({...prev, [fileType]: dummyUrl}));
-                setUploadingState(prev => ({...prev, [fileType]: false}));
-                showToast(`Simulasi unggah ${fileType} berhasil.`, 'success');
-            }, 1500);
             return;
         }
 
@@ -690,7 +745,7 @@
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
 
-            const base64Compressed = canvas.toDataURL('image/jpeg', 0.7);
+            const base64Compressed = canvas.toDataURL('image/jpeg', 0.75);
             const base64Clean = base64Compressed.split(',')[1];
 
             try {
@@ -700,6 +755,7 @@
                 body: JSON.stringify({
                   action: 'uploadFile',
                   NoAnggota: userData.NoAnggota,
+                  password: userData._sessionPassword || '',
                   fileType: fileType,
                   base64: base64Clean,
                   mimeType: 'image/jpeg',
@@ -751,45 +807,130 @@
             
             <form className="flex flex-col gap-8" onSubmit={handleUpdateData}>
               
-              {/* Section: Data Pribadi */}
+              {/* Section: Data Resmi Terverifikasi */}
               <section className="bg-surface rounded-3xl p-5 shadow-card border border-gray-100">
-                <SectionHeader title="Data Pribadi" subtitle="Informasi identitas dan kontak" icon="badge" borderColor="bg-primary/10 text-primary" />
+                <SectionHeader title="Data Keanggotaan Resmi" subtitle="Hanya dapat diubah oleh Pengurus / HR Koperasi" icon="verified" borderColor="bg-primary/10 text-primary" />
                 <div className="flex flex-col gap-4">
-                  <InputField label="Nama Sesuai KTP" name="Nama" value={formData.Nama || ''} onChange={handleChange} icon="person" required />
-                  
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[13px] font-sans font-semibold text-text-main">Site / Lokasi Kerja</label>
-                    <div className="relative flex items-center group">
-                      <span className="material-symbols-outlined absolute left-3.5 text-text-muted group-focus-within:text-primary transition-colors text-[20px]">location_on</span>
-                      <select name="Site" value={formData.Site || ''} onChange={handleChange} className="w-full h-12 pl-11 pr-10 bg-background rounded-xl border border-gray-200 text-text-main text-[14px] font-sans focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all outline-none appearance-none" required>
-                        <option value="" disabled>Pilih Site Anda</option>
-                        {['KM 73', 'KELANIS', 'DAHAI', 'ANGGOTA LUAR BIASA', 'PT MBK', 'BRO', 'YABN'].map(opt => (
-                           <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
-                      <span className="material-symbols-outlined absolute right-3.5 text-text-muted pointer-events-none text-[20px]">expand_more</span>
-                    </div>
-                  </div>
+                  <InputField 
+                    label="Nomor Anggota" 
+                    name="NoAnggota" 
+                    value={formData.NoAnggota || '-'} 
+                    isReadOnly={true}
+                    lockBadge="Resmi"
+                    icon="badge" 
+                    helper="Nomor identitas tetap Anda di Koperasi AKM."
+                  />
+                  <InputField 
+                    label="Nama Lengkap (Sesuai KTP)" 
+                    name="Nama" 
+                    value={formData.Nama || ''} 
+                    isReadOnly={true}
+                    lockBadge="Terkunci"
+                    icon="person" 
+                    helper="Hubungi pengurus koperasi jika ada perubahan nama resmi."
+                  />
+                  <InputField 
+                    label="Site / Unit Penempatan" 
+                    name="Site" 
+                    value={formData.Site || ''} 
+                    isReadOnly={true}
+                    lockBadge="Terkunci"
+                    icon="location_on" 
+                    helper="Penempatan unit kerja resmi terdaftar."
+                  />
+                </div>
+              </section>
 
-                  <InputField label="Tempat, Tanggal Lahir" name="TempatTanggalLahir" value={formData.TempatTanggalLahir || ''} onChange={handleChange} icon="event" placeholder="e.g. Jakarta, 1 Jan 1990" />
-                  <InputField label="No KTP (NIK)" name="NoKTP" value={formData.NoKTP || ''} onChange={handleChange} icon="credit_card" type="number" />
-                  <InputField label="NPWP" name="NPWP" value={formData.NPWP || ''} onChange={handleChange} icon="receipt_long" />
-                  <InputField label="Alamat Email" name="Email" value={formData.Email || ''} onChange={handleChange} icon="mail" type="email" />
-                  <InputField label="No. Handphone (WhatsApp)" name="NoHP" value={formData.NoHP || ''} onChange={handleChange} icon="call" type="tel" />
+              {/* Section: Data Biodata & Kontak (Dapat diedit oleh Anggota) */}
+              <section className="bg-surface rounded-3xl p-5 shadow-card border border-gray-100">
+                <SectionHeader title="Biodata & Kontak Pribadi" subtitle="Pastikan data aktif dan sesuai untuk verifikasi" icon="contact_page" borderColor="bg-primary/10 text-primary" />
+                <div className="flex flex-col gap-4">
+                  <InputField 
+                    label="Tempat, Tanggal Lahir" 
+                    name="TempatTanggalLahir" 
+                    value={formData.TempatTanggalLahir || ''} 
+                    onChange={handleChange} 
+                    icon="event" 
+                    placeholder="Contoh: Tabalong, 15 Agu 1992" 
+                  />
+                  
+                  <InputField 
+                    label="Nomor Induk Kependudukan (NIK KTP)" 
+                    name="NoKTP" 
+                    value={formData.NoKTP || ''} 
+                    onChange={handleChange} 
+                    icon="credit_card" 
+                    type="text"
+                    maxLength="16"
+                    placeholder="16 digit NIK KTP Anda"
+                    helper={formData.NoKTP && formData.NoKTP.length !== 16 ? `⚠️ Masih ${formData.NoKTP.length} digit (wajib 16 digit)` : 'Format 16 digit angka'}
+                  />
+
+                  <InputField 
+                    label="Nomor Pokok Wajib Pajak (NPWP)" 
+                    name="NPWP" 
+                    value={formData.NPWP || ''} 
+                    onChange={handleChange} 
+                    icon="receipt_long" 
+                    placeholder="Contoh: 12.345.678.9-123.000"
+                  />
+
+                  <InputField 
+                    label="Alamat Email Aktif" 
+                    name="Email" 
+                    value={formData.Email || ''} 
+                    onChange={handleChange} 
+                    icon="mail" 
+                    type="email" 
+                    placeholder="email@perusahaan.com"
+                  />
+
+                  <InputField 
+                    label="Nomor WhatsApp / Handphone" 
+                    name="NoHP" 
+                    value={formData.NoHP || ''} 
+                    onChange={handleChange} 
+                    icon="call" 
+                    type="tel" 
+                    placeholder="081234567890"
+                    helper="Nomor aktif untuk konfirmasi & notifikasi transaksi"
+                  />
                   
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[13px] font-sans font-semibold text-text-main">Alamat Domisili</label>
-                    <textarea name="Alamat" value={formData.Alamat || ''} onChange={handleChange} rows="3" className="w-full p-3.5 bg-background rounded-xl border border-gray-200 text-text-main text-[14px] font-sans focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all outline-none resize-none leading-relaxed" placeholder="Tuliskan alamat lengkap..."></textarea>
+                    <label className="text-[13px] font-sans font-semibold text-text-main">Alamat Lengkap Domisili</label>
+                    <textarea 
+                      name="Alamat" 
+                      value={formData.Alamat || ''} 
+                      onChange={handleChange} 
+                      rows="3" 
+                      className="w-full p-3.5 bg-background rounded-xl border border-gray-200 text-text-main text-[14px] font-sans focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all outline-none resize-none leading-relaxed" 
+                      placeholder="Tuliskan alamat domisili lengkap..."
+                    ></textarea>
                   </div>
                 </div>
               </section>
 
               {/* Section: Data Rekening */}
               <section className="bg-surface rounded-3xl p-5 shadow-card border border-gray-100">
-                <SectionHeader title="Data Rekening" subtitle="Untuk keperluan pencairan dana" icon="account_balance" borderColor="bg-secondary/10 text-secondary-dark" />
+                <SectionHeader title="Rekening Bank Pribadi" subtitle="Untuk pencairan dana pinjaman dan simpanan" icon="account_balance" borderColor="bg-secondary/10 text-secondary-dark" />
                 <div className="flex flex-col gap-4">
-                  <InputField label="Nama Bank" name="NamaBank" value={formData.NamaBank || ''} onChange={handleChange} icon="domain" placeholder="e.g. BCA, Mandiri" />
-                  <InputField label="Nomor Rekening" name="NoRekening" value={formData.NoRekening || ''} onChange={handleChange} icon="numbers" type="number" />
+                  <InputField 
+                    label="Nama Bank" 
+                    name="NamaBank" 
+                    value={formData.NamaBank || ''} 
+                    onChange={handleChange} 
+                    icon="domain" 
+                    placeholder="Contoh: Bank Mandiri, BCA, BRI" 
+                  />
+                  <InputField 
+                    label="Nomor Rekening" 
+                    name="NoRekening" 
+                    value={formData.NoRekening || ''} 
+                    onChange={handleChange} 
+                    icon="numbers" 
+                    type="text"
+                    placeholder="Hanya angka nomor rekening"
+                  />
                 </div>
               </section>
 
@@ -833,13 +974,19 @@
                <button type="button" onClick={() => setIsPasswordModalOpen(true)} className="w-full h-12 bg-surface border-2 border-gray-200 text-text-main rounded-xl font-sans font-semibold text-[14px] active:bg-gray-100 transition-colors flex items-center justify-center gap-2 shadow-sm">
                    <span className="material-symbols-outlined text-primary text-[20px]">key</span> Ubah Kata Sandi Akun
                </button>
-               <p className="text-center text-[11px] font-sans text-text-muted mt-3">Pembaruan data dilindungi sistem enkripsi Koperasi AKM.</p>
+               <p className="text-center text-[11px] font-sans text-text-muted mt-3">Pembaruan data dilindungi sistem keamanan Koperasi AKM.</p>
             </div>
             
           </main>
           
           <BottomNav activeTab="profile" onNavigate={onNavigate} />
-          <PasswordModal isOpen={isPasswordModalOpen} onClose={() => setIsPasswordModalOpen(false)} userData={userData} showToast={showToast} />
+          <PasswordModal 
+            isOpen={isPasswordModalOpen} 
+            onClose={() => setIsPasswordModalOpen(false)} 
+            userData={userData} 
+            setUserData={setUserData}
+            showToast={showToast} 
+          />
         </div>
       );
     };
